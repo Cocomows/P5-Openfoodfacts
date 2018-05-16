@@ -3,7 +3,8 @@
 #
 import sys
 import os
-import mysql.connector
+#~ import mysql.connector
+import bdd 
 
 def clear_and_print(txtmenu, txtchoice=False):
     os.system('cls||clear')
@@ -11,44 +12,53 @@ def clear_and_print(txtmenu, txtchoice=False):
     if txtchoice:
         print(txtchoice)
     return
+    
+def select_product(rows, choice_int):
+    text_choice = ("Vous avez choisi la catégorie numéro "+str(rows[choice_int][0])+
+               " : "+str(rows[choice_int][1]))
+    clear_and_print(text_choice)
+    bdd.display_products_page(rows[choice_int][0], 1)
+    #~ conn = mysql.connector.connect(host="localhost",user="cocomo",password="password", database="openfoodfacts")
+    #~ cursor = conn.cursor()
+
+    #~ cursor.execute("""SELECT product_id, product_name, product_brand, 
+                    #~ nutriscore FROM product WHERE product_id <= %s 
+                    #~ AND category_id = %s""", ("20", str(rows[choice_int][0])))
+    #~ rows = cursor.fetchall()
+    
+    #~ for row in rows:
+        #~ print('{0} : {1} - {2} nutriscore : {3}'.format(row[0], row[1], row[2], row[3]))
+
+
+    #~ conn.close()
+    return
 
 def select_category():
 
-    txt_menu2 = ("Selectionnez votre catégorie d'aliment à l'aide du numéro, Q pour quitter, "+
+    txt_menu_cat = ("Selectionnez votre catégorie d'aliment à l'aide du numéro, Q pour quitter, "+
                  "M pour revenir au menu principal:\n")
 
-    conn = mysql.connector.connect(host="localhost", user="cocomo", password="password",
-                                   database="openfoodfacts")
-    cursor = conn.cursor()
-
-    cursor.execute("""SELECT * FROM category""")
-    rows = cursor.fetchall()
-    for row in rows:
-        txt_menu2 += ('{0} : {1} - {2}\n'.format(row[0], row[1], row[2]))
-
-    conn.close()
-
-    clear_and_print(txt_menu2)
+    categories = bdd.get_categories()
+    for category in categories:
+        txt_menu_cat += ('{0} : {1} - {2}\n'.format(category[0], category[1], category[2]))
+    clear_and_print(txt_menu_cat)
 
     user_choice = input(">>")
 
-
-    while user_choice != 'q' and user_choice != 'm':
+    while user_choice != 'q' and user_choice != 'm' and user_choice != 'Q' and user_choice != 'M':
         try:
             choice_int = int(user_choice)-1
 
-            if 0 <= choice_int < len(rows):
-                try:
-                    text_choice = ("Vous avez choisi la catégorie numéro "+str(rows[choice_int][0])+
-                                   " : "+str(rows[choice_int][1]))
-                    clear_and_print(txt_menu2, text_choice)
-                except IndexError:
-                    clear_and_print(txt_menu2, "Erreur : Le nombre n'est pas dans la liste")
+            if 0 <= choice_int < len(categories):
+                #~ Correct choice, handle the chosen category
+                select_product(categories, choice_int)
             else:
-                clear_and_print(txt_menu2, "Le nombre choisi n'est pas dans la liste")
+                clear_and_print(txt_menu_cat, "Le nombre choisi n'est pas dans la liste")
 
         except ValueError:
-            clear_and_print(txt_menu2, 'Choix non reconnu')
+            error = ("Choix non reconnu, veuillez entrer un nombre, ou Q pour quitter, "+
+                   "M pour revenir au menu principal")
+            clear_and_print(txt_menu_cat, error)
 
         user_choice = input(">>")
     return user_choice
@@ -62,7 +72,7 @@ def menu_principal():
     clear_and_print(txt_menu1)
     user_choice = input(">>")
 
-    while user_choice != 'q':
+    while user_choice != 'q' and user_choice != 'Q':
 
         if user_choice == '1':
             #~ Demander la catégorie
@@ -76,7 +86,7 @@ def menu_principal():
         else:
             clear_and_print(txt_menu1, 'Choix non reconnu')
 
-        if user_choice != 'q':
+        if user_choice != 'q' and user_choice != 'Q':
 
             user_choice = input(">>")
 
