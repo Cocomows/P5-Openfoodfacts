@@ -13,49 +13,80 @@ def clear_and_print(txtmenu, txtchoice=False):
         print(txtchoice)
     return
 
-def pretty_print_product(product):
-    str_product = """
-Produit             : {}
-Marque              : {}
-Description         : {}
-Nutriscore          : {}
-En vente chez       : {}
-Lien openfoodfacts  : {}
+def str_product(product):
     """
+    Returns a string of a product with informations displayed in a readable way
+    Param : product : list returned from database with all informations
+    """
+    str_product = """
+    Produit             : {}
+    Marque              : {}
+    Description         : {}
+    Nutriscore          : {}
+    En vente chez       : {}
+    Lien openfoodfacts  : {}"""
     if not product[6]:
         store = "Information non disponible"
     else:
         store = product[6]
-    print(str_product.format(product[1], product[3], product[5], NUTRISCORE[product[4]],
+    return(str_product.format(product[1], product[3], product[5], NUTRISCORE[product[4]],
                              store, product[7]))
 
+def save_option(txtproduit, product_id):
+
+    txt_sauv = "\n\nSouhaitez vous sauvegarder le résultat ?\n"
+    txt_sauv += "[O]ui ou [N]on pour revenir au menu précédent."
+    clear_and_print(txtproduit, txt_sauv)
+    user_choice = input(">>")
+    while True:
+        if user_choice.lower() == 'q':
+            return 'q'
+        elif user_choice.lower() == 'n':
+            return 'm'
+        elif user_choice.lower() == 'o':
+            save_product(product_id)
+            clear_and_print(txtproduit)
+            print("\n\nLe produit a bien été sauvegardé.\n"+
+                  "Appuyez sur Entrée pour revenir au menu précédent.")
+
+            user_choice = input(">>")
+            return 'm'
+        else:
+            clear_and_print(txtproduit, txt_sauv)
+            print("Choix non reconnu")
+        user_choice = input(">>")
+    return user_choice
 
 def display_alternative_product(choice_int, category_id, page):
 
     product_info = get_product(category_id, page, choice_int)
     nutriscore_int = product_info[4]
-    clear_and_print("Vous avez choisi le produit suivant :")
-    pretty_print_product(product_info)
+    txtproduit = "Vous avez choisi le produit suivant :\n"
+
+    txtproduit += str_product(product_info)
     if nutriscore_int != 0:
-        print("Ce produit a un nutriscore de {}\n".format(NUTRISCORE[nutriscore_int]))
+        txtproduit += ("Ce produit a un nutriscore de {}.\n".format(NUTRISCORE[nutriscore_int]))
         if nutriscore_int == get_best_score_category(category_id):
-            print("Félicitations, votre produit possède déjà le meilleur score de sa catégorie !")
+            txtproduit += ("\nFélicitations, votre produit possède déjà le meilleur score de sa catégorie !\n")
             if(get_alternative(product_info[0])):
-                print("Un autre produit de la même catégorie"+
-                      "avec un score identique pourrait être :")
-                pretty_print_product(get_alternative(product_info[0]))
+                txtproduit +=("\nUn autre produit de la même catégorie "+
+                      "avec un score identique pourrait être :\n")
+                txtproduit +=(str_product(get_alternative(product_info[0])))
             else:
-                print("Il n'y a pas d'autre produit dans cette catégorie avec un score identique")
+                txtproduit +=("\nIl n'y a pas d'autre produit dans cette catégorie avec un score identique")
+                return save_option(txtproduit, product_info[0])
+                
         else:
-            print("Voici une alternative à votre produit avec un meilleur nutriscore : ")
-            pretty_print_product(get_alternative(product_info[0]))
+            txtproduit +=("\nVoici une alternative à votre produit avec un meilleur nutriscore :\n")
+            txtproduit +=(str_product(get_alternative(product_info[0])))
 
     else:
-        print("Le nutriscore du produit que vous avez sélectionné n'est pas renseigné.\n")
-        print("Voici un produit de la même catégorie avec le meilleur nutriscore possible :")
-        pretty_print_product(get_alternative(product_info[0]))
+        txtproduit +=("Le nutriscore du produit que vous avez sélectionné n'est pas renseigné.\n")
+        txtproduit +=("Voici un produit de la même catégorie avec le meilleur nutriscore possible :\n")
+        txtproduit +=(str_product(get_alternative(product_info[0])))
 
-    return
+    return save_option(txtproduit, get_alternative(product_info[0])[0] )
+
 
 def filldatabase_menu(text_choice, category_txt, category_id):
     text_choice += ("\nIl n'y a pas de produits pour cette catégorie, voulez-vous requêter"+
@@ -106,7 +137,9 @@ def display_pages(text_choice, category_id):
     page = 1
     total_pages = get_number_pages(category_id)
     if total_pages > 1:
-        text_choice += ("\nNavigation avec (B)ack et (N)ext pour la pagination")
+        text_choice += ("\nSélectionnez un des produits avec le nombre correspondant."+
+                        "\nNavigation avec [B]ack et [N]ext pour la pagination"+
+                        "\nQ pour quitter, M pour revenir au menu précédent.")
 
     clear_and_print(text_choice)
     print_products_page(category_id, page)
@@ -128,7 +161,12 @@ def display_pages(text_choice, category_id):
                 choice_int = int(user_choice)
                 if 0 < choice_int <= ROWS_PER_PAGE:
                     #~ Correct choice, handle the chosen category
-                    display_alternative_product(choice_int, category_id, page)
+                    user_choice = display_alternative_product(choice_int, category_id, page)
+                    if user_choice.lower() == 'q':
+                        break
+                    else:
+                        clear_and_print(text_choice)
+                        print_products_page(category_id, page)
                 else:
                     clear_and_print(text_choice)
                     print_products_page(category_id, page)
@@ -152,15 +190,12 @@ def select_product(categories, choice_int):
                                                                         category_txt)
 
     #~ Check number of products in selected category
-
     if get_number_products(category_id) == 0:
         #~ Ask if user wants to request products
-        user_choice = filldatabase_menu(text_choice, category_txt, category_id)
-        return user_choice
+        return filldatabase_menu(text_choice, category_txt, category_id)
     else:
         #~ There are products, we display them with pages
-        user_choice = display_pages(text_choice, category_id)
-        return user_choice
+        return display_pages(text_choice, category_id)
 
 def select_category():
 
@@ -218,7 +253,9 @@ def menu_principal():
                 break
         elif user_choice == '2':
             #~ Retrouver les aliments substitués
-            clear_and_print(txt_menu1, 'Choix 2')
+            str_saved = "Voici la liste des aliments sauvegardés :\n\n"
+            str_saved += get_str_saved()
+            clear_and_print(txt_menu1, str_saved)
         elif user_choice.lower() == 'q':
             break
         else:

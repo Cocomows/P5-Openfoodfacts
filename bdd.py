@@ -9,7 +9,7 @@ import math
 import mysql.connector
 import requests
 
-ROWS_PER_PAGE = 30
+ROWS_PER_PAGE = 40
 
 NUTRISCORE = {
     0: 'N/A',
@@ -42,7 +42,8 @@ def print_products_page(category_id, page):
         display_str = '\nAffichage des résultats {} à {} sur {} (Page {} sur {}):'
         #~ print(display_str.format(products[0][0], (products[0][0]+len(products)-1),
                                  #~ number_of_rows, page, total_pages))
-        print(display_str.format((((page-1)*ROWS_PER_PAGE)+1), (((page-1)*ROWS_PER_PAGE)+len(products)),
+        print(display_str.format((((page-1)*ROWS_PER_PAGE)+1),
+                                 (((page-1)*ROWS_PER_PAGE)+len(products)),
                                  number_of_rows, page, total_pages))
 
         #~ de (page-1 * ROWS_PER_PAGE)+1 à (page * ROWS_PER_PAGE)
@@ -125,7 +126,8 @@ def get_category_url(category_id):
     """
     conn = mysql.connector.connect(**CONNECTION_PARAMETERS)
     cursor = conn.cursor()
-    cursor.execute("""SELECT link_openfoodfacts FROM category WHERE category_id = %s""",(category_id,))
+    cursor.execute("""SELECT link_openfoodfacts FROM category WHERE category_id = %s""",
+                   (category_id,))
     (url,) = cursor.fetchone()
     conn.close()
     return url
@@ -139,26 +141,20 @@ def insert_db(category_id):
     nb_pages = int(math.ceil(json_categorie["count"] / json_categorie["page_size"]))
 
     data = []
-
+    current_product = 0
 
     for page in range(0, nb_pages):
         json_categorie = requests.get(url_category+str(page+1)+".json").json()
 
         #~ print("-Requesting products of page "+str(page+1)+" out of "+str(nb_pages))
-        print_progress(page+1,nb_pages, decimals = 0)
+
+        #~ print_progress(page+1, nb_pages, decimals = 0)
         for product in json_categorie["products"]:
+            print_progress(current_product, json_categorie["count"], decimals=0)
             try:
                 str_nutr_grade = product["nutrition_grade_fr"]
-                if str_nutr_grade == 'a':
-                    nutriscore = 1
-                if str_nutr_grade == 'b':
-                    nutriscore = 2
-                if str_nutr_grade == 'c':
-                    nutriscore = 3
-                if str_nutr_grade == 'd':
-                    nutriscore = 4
-                if str_nutr_grade == 'e':
-                    nutriscore = 5
+                nutriscore = list(NUTRISCORE.keys())[
+                    list(NUTRISCORE.values()).index(str_nutr_grade.upper())]
             except KeyError:
                 str_nutr_grade = "N/A"
                 nutriscore = 0
@@ -169,15 +165,16 @@ def insert_db(category_id):
                     stores = product["stores"]
             except KeyError:
                 stores = None
-            
+
             try:
-                if product["generic_name"] == "":
-                    desc = product["ingredients_text"]
-                else: 
-                    desc = product["generic_name"]
-                
+                desc = product["generic_name"]
             except KeyError:
-                desc = product["ingredients_text"]
+                desc = ""
+                try:
+                    desc = product["ingredients_text"]
+                except KeyError:
+                    desc = ""
+
 
             link = "https://fr.openfoodfacts.org/produit/"+str(product["code"])
 
@@ -188,9 +185,12 @@ def insert_db(category_id):
                 desc,
                 stores,
                 link,
-                None,
+                False,
                 product["brands"]
             ))
+
+            current_product += 1
+
 
     conn = mysql.connector.connect(**CONNECTION_PARAMETERS)
     cursor = conn.cursor()
@@ -235,7 +235,7 @@ def get_best_score_category(category_id):
     row = cursor.fetchone()
     conn.close()
     return row[0]
-    
+
 def get_alternative(product_id):
     """
     Request a single product with a nutriscore better than the given one
@@ -251,31 +251,81 @@ def get_alternative(product_id):
     nutriscore_int = row[0]
     category_id = row[1]
     best_score = get_best_score_category(category_id)
-    
-    #~ Try to get a better product with a store 
-    cursor.execute("""SELECT * FROM product 
-                      WHERE nutriscore = %s 
+
+    #~ Try to get a better product with a store
+    cursor.execute("""SELECT * FROM product
+                      WHERE nutriscore = %s
                       AND category_id = %s
                       AND product_id != %s
                       AND store IS NOT NULL
                       ORDER BY product_id ASC
-                      LIMIT 1""", 
+                      LIMIT 1""",
                    (best_score, category_id, product_id))
     result = cursor.fetchone()
         #~ if no result, get a product without a store:
     if not result:
-        cursor.execute("""SELECT * FROM product 
-                          WHERE nutriscore = %s 
+        cursor.execute("""SELECT * FROM product
+                          WHERE nutriscore = %s
                           AND category_id = %s
                           AND product_id != %s
                           ORDER BY product_id ASC
-                          LIMIT 1""", 
+                          LIMIT 1""",
                        (best_score, category_id, product_id))
         result = cursor.fetchone()
     conn.close()
 
     return result
 
+
+def get_saved_products():
+    """
+    Request saved products from the database and returns a list of products
+    """
+    conn = mysql.connector.connect(**CONNECTION_PARAMETERS)
+    cursor = conn.cursor()
+    cursor.execute("""SELECT category_name, product_name, product_brand, nutriscore, 
+                      product.link_openfoodfacts, store  
+                      FROM product  INNER JOIN category 
+                      ON category.category_id = product.category_id 
+                      WHERE saved = true
+                      ORDER BY category.category_id""")
+    saved_products = cursor.fetchall()
+    conn.close()
+    return saved_products
+
+def get_str_saved():
+    """
+    Returns string with saved product formatted
+    """
+    format_string = '{0:30} | {1:50} | {2:^10} | {3:50} | {4}  \n'
+    res = format_string.format('Catégorie', 'Produit - Marque', 'Nutriscore', 'Lien', 'Magasin')
+    res+= '='*170
+    res+= '\n'
+    for product in get_saved_products():
+        
+        if not product[5]:
+            store = "Information non disponible"
+        else:
+            store = product[5]
+        
+        res += (format_string.format(product[0], product[1]+' - '+product[2], NUTRISCORE[product[3]],
+                      product[4], store))
+    return res
+    
+
+def save_product(product_id):
+    """
+    Change saved column on table product in database for given product_id
+    """
+    conn = mysql.connector.connect(**CONNECTION_PARAMETERS)
+    cursor = conn.cursor()
+    cursor.execute("""UPDATE product 
+                      SET saved = TRUE
+                      WHERE product_id = %s """,
+               (product_id,))
+    conn.commit()
+    conn.close()
+    return
 
 def clear_products():
     """
@@ -315,6 +365,4 @@ def print_progress(iteration, total, prefix='', suffix='', decimals=1, bar_lengt
     if iteration == total:
         sys.stdout.write('\n')
     sys.stdout.flush()
-
-
 
