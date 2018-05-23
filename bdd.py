@@ -4,6 +4,7 @@
 Module used to handle interactions with the database and display functions
 in the openfoodfact project
 """
+import sys
 import math
 import mysql.connector
 import requests
@@ -38,15 +39,19 @@ def print_products_page(category_id, page):
         print("Aucun résultat")
         #~ Add option to fill database with results from site
     else:
-        display_str = '\nDisplaying results {} to {} out of {} (Page {} out of {}):'
-        print(display_str.format(products[0][0], (products[0][0]+len(products)-1),
+        display_str = '\nAffichage des résultats {} à {} sur {} (Page {} sur {}):'
+        #~ print(display_str.format(products[0][0], (products[0][0]+len(products)-1),
+                                 #~ number_of_rows, page, total_pages))
+        print(display_str.format((((page-1)*ROWS_PER_PAGE)+1), (((page-1)*ROWS_PER_PAGE)+len(products)),
                                  number_of_rows, page, total_pages))
+
+        #~ de (page-1 * ROWS_PER_PAGE)+1 à (page * ROWS_PER_PAGE)
 
         format_string = '{0:>3} |{1:<110}| {2}'
         print(format_string.format("Num", "Produit - Marque", "Lien Openfoodfacts"))
         print('='*170)
 
-
+        #~ Using enumerate to get index of the loop displayed as choice
         for index, product in enumerate(products, start=1):
             product_fullname = str(product[1])+" - "+str(product[2])
             print(format_string.format(index, product_fullname, product[4]))
@@ -72,8 +77,6 @@ def get_products_page(category_id, page):
 
     conn.close()
     return rows
-
-
 
 def get_number_products(category_id):
     """
@@ -116,11 +119,21 @@ def get_categories():
     conn.close()
     return categories
 
+def get_category_url(category_id):
+    """
+    Request url from the database for a given category
+    """
+    conn = mysql.connector.connect(**CONNECTION_PARAMETERS)
+    cursor = conn.cursor()
+    cursor.execute("""SELECT link_openfoodfacts FROM category WHERE category_id = %s""",(category_id,))
+    (url,) = cursor.fetchone()
+    conn.close()
+    return url
 
-def insert_db(url_categorie, categorie_id):
+def insert_db(category_id):
     """This function add products in database for a given category"""
-
-    json_categorie = requests.get(url_categorie+"1.json").json()
+    url_category = get_category_url(category_id)
+    json_categorie = requests.get(url_category+"1.json").json()
 
     #~ Number of pages calculated with count of products / product displayed per page
     nb_pages = int(math.ceil(json_categorie["count"] / json_categorie["page_size"]))
@@ -129,10 +142,10 @@ def insert_db(url_categorie, categorie_id):
 
 
     for page in range(0, nb_pages):
-        json_categorie = requests.get(url_categorie+str(page+1)+".json").json()
+        json_categorie = requests.get(url_category+str(page+1)+".json").json()
 
-        print("-Requesting products of page "+str(page+1)+" out of "+str(nb_pages))
-
+        #~ print("-Requesting products of page "+str(page+1)+" out of "+str(nb_pages))
+        print_progress(page+1,nb_pages, decimals = 0)
         for product in json_categorie["products"]:
             try:
                 str_nutr_grade = product["nutrition_grade_fr"]
@@ -149,19 +162,30 @@ def insert_db(url_categorie, categorie_id):
             except KeyError:
                 str_nutr_grade = "N/A"
                 nutriscore = 0
-
-            if product["stores"] == "":
-                stores = "N/A"
-            else:
-                stores = product["stores"]
+            try:
+                if product["stores"] == "":
+                    stores = None
+                else:
+                    stores = product["stores"]
+            except KeyError:
+                stores = None
+            
+            try:
+                if product["generic_name"] == "":
+                    desc = product["ingredients_text"]
+                else: 
+                    desc = product["generic_name"]
+                
+            except KeyError:
+                desc = product["ingredients_text"]
 
             link = "https://fr.openfoodfacts.org/produit/"+str(product["code"])
 
             data.append((
                 product["product_name"],
-                categorie_id,
+                category_id,
                 nutriscore,
-                product["ingredients_text"],
+                desc,
                 stores,
                 link,
                 None,
@@ -182,25 +206,115 @@ def insert_db(url_categorie, categorie_id):
     cursor.close()
     conn.close()
 
-
-def get_product(category_id, index):
+def get_product(category_id, page, index):
     """
-    Request products for a given category at the given page
-    returns a list of products with the following information :
-    product_id, product_name, product_brand, nutriscore,link_openfoodfacts
+    Request a single product for a given category at the given page
+    returns a list with the following information :
+    product_id, product_name, category_id, product_brand, nutriscore, description,
+    store, link_openfoodfacts, saved
     """
     conn = mysql.connector.connect(**CONNECTION_PARAMETERS)
     cursor = conn.cursor()
 
     #~ Get results
-    cursor.execute("""SELECT product_id, product_name, product_brand,
-                    nutriscore,link_openfoodfacts FROM product WHERE category_id = %s
+    cursor.execute("""SELECT * FROM product WHERE category_id = %s
                     ORDER BY product_id ASC
-                    LIMIT 1 OFFSET %s""", (category_id, index-1))
-    rows = cursor.fetchall()
+                    LIMIT 1 OFFSET %s""", (category_id, (index-1+(page-1)*ROWS_PER_PAGE)))
+    row = cursor.fetchone()
 
     conn.close()
-    return rows
+    return row
 
-#~ print(get_product(1,6))
+def get_best_score_category(category_id):
+    """
+    Returns the best available nutriscore for a given category
+    """
+    conn = mysql.connector.connect(**CONNECTION_PARAMETERS)
+    cursor = conn.cursor()
+    cursor.execute("""SELECT MIN(nutriscore) FROM product WHERE category_id = %s AND nutriscore !=  0 """, (category_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return row[0]
+    
+def get_alternative(product_id):
+    """
+    Request a single product with a nutriscore better than the given one
+    returns a list with the following information :
+    product_id, product_name, category_id, product_brand, nutriscore, description,
+    store, link_openfoodfacts, saved
+    returns None if no alternative available
+    """
+    conn = mysql.connector.connect(**CONNECTION_PARAMETERS)
+    cursor = conn.cursor()
+    cursor.execute("""SELECT nutriscore, category_id FROM product WHERE product_id =  %s """, (product_id,))
+    row = cursor.fetchone()
+    nutriscore_int = row[0]
+    category_id = row[1]
+    best_score = get_best_score_category(category_id)
+    
+    #~ Try to get a better product with a store 
+    cursor.execute("""SELECT * FROM product 
+                      WHERE nutriscore = %s 
+                      AND category_id = %s
+                      AND product_id != %s
+                      AND store IS NOT NULL
+                      ORDER BY product_id ASC
+                      LIMIT 1""", 
+                   (best_score, category_id, product_id))
+    result = cursor.fetchone()
+        #~ if no result, get a product without a store:
+    if not result:
+        cursor.execute("""SELECT * FROM product 
+                          WHERE nutriscore = %s 
+                          AND category_id = %s
+                          AND product_id != %s
+                          ORDER BY product_id ASC
+                          LIMIT 1""", 
+                       (best_score, category_id, product_id))
+        result = cursor.fetchone()
+    conn.close()
+
+    return result
+
+
+def clear_products():
+    """
+    Clears the database of all products. Used for maintenance only.
+    """
+    conn = mysql.connector.connect(**CONNECTION_PARAMETERS)
+    cursor = conn.cursor()
+    print("Clearing table product")
+    try:
+        cursor.execute("""TRUNCATE TABLE product""")
+        cursor.execute("""ALTER TABLE product AUTO_INCREMENT = 1""")
+    except mysql.connector.Error as err:
+        print("Failed clearing table: {}".format(err))
+
+    conn.commit()
+    conn.close()
+    print("Table cleared")
+
+def print_progress(iteration, total, prefix='', suffix='', decimals=1, bar_length=100):
+    """
+    Call in a loop to create terminal progress bar
+    @params:
+        iteration   - Required  : current iteration (Int)
+        total       - Required  : total iterations (Int)
+        prefix      - Optional  : prefix string (Str)
+        suffix      - Optional  : suffix string (Str)
+        decimals    - Optional  : positive number of decimals in percent complete (Int)
+        bar_length  - Optional  : character length of bar (Int)
+    """
+    str_format = "{0:." + str(decimals) + "f}"
+    percents = str_format.format(100 * (iteration / float(total)))
+    filled_length = int(round(bar_length * iteration / float(total)))
+    bar = '█' * filled_length + '-' * (bar_length - filled_length)
+
+    sys.stdout.write('\r%s |%s| %s%s %s' % (prefix, bar, percents, '%', suffix)),
+
+    if iteration == total:
+        sys.stdout.write('\n')
+    sys.stdout.flush()
+
+
 
