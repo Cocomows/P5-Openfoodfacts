@@ -1,12 +1,19 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
-import sys
+"""
+Module used to offer a command line interface to navigate the application
+P5 Openfoodfacts.
+Displays products for a given Openfoodfacts category and offers an alternative product with
+a better nutriscore when user selects a product
+"""
 import os
-#~ import mysql.connector
 from bdd import *
 
 def clear_and_print(txtmenu, txtchoice=False):
+    """
+    Clears command line interface and prints given choice, with an optional second str to add
+    """
     os.system('cls||clear')
     print(txtmenu)
     if txtchoice:
@@ -18,7 +25,8 @@ def str_product(product):
     Returns a string of a product with informations displayed in a readable way
     Param : product : list returned from database with all informations
     """
-    str_product = """
+
+    str_res = """
     Produit             : {}
     Marque              : {}
     Description         : {}
@@ -29,11 +37,13 @@ def str_product(product):
         store = "Information non disponible"
     else:
         store = product[6]
-    return(str_product.format(product[1], product[3], product[5], NUTRISCORE[product[4]],
-                             store, product[7]))
+    return(str_res.format(product[1], product[3], product[5], NUTRISCORE[product[4]],
+                          store, product[7]))
 
 def save_option(txtproduit, product_id):
-
+    """
+    Menu to allow user to save a product
+    """
     txt_sauv = "\n\nSouhaitez vous sauvegarder le résultat ?\n"
     txt_sauv += "[O]ui ou [N]on pour revenir au menu précédent."
     clear_and_print(txtproduit, txt_sauv)
@@ -58,7 +68,9 @@ def save_option(txtproduit, product_id):
     return user_choice
 
 def display_alternative_product(choice_int, category_id, page):
-
+    """
+    For a product selected from the product menu, displays an alternative and calls save_option
+    """
     product_info = get_product(category_id, page, choice_int)
     nutriscore_int = product_info[4]
     txtproduit = "Vous avez choisi le produit suivant :\n"
@@ -67,26 +79,29 @@ def display_alternative_product(choice_int, category_id, page):
     if nutriscore_int != 0:
         txtproduit += ("Ce produit a un nutriscore de {}.\n".format(NUTRISCORE[nutriscore_int]))
         if nutriscore_int == get_best_score_category(category_id):
-            txtproduit += ("\nFélicitations, votre produit possède déjà le meilleur score de sa catégorie !\n")
-            if(get_alternative(product_info[0])):
-                txtproduit +=("\nUn autre produit de la même catégorie "+
-                      "avec un score identique pourrait être :\n")
-                txtproduit +=(str_product(get_alternative(product_info[0])))
+            txtproduit += ("\nFélicitations, votre produit possède déjà le"+
+                           " meilleur score de sa catégorie !\n")
+            if get_alternative(product_info[0]):
+                txtproduit += ("\nUn autre produit de la même catégorie "+
+                               "avec un score identique pourrait être :\n")
+                txtproduit += (str_product(get_alternative(product_info[0])))
             else:
-                txtproduit +=("\nIl n'y a pas d'autre produit dans cette catégorie avec un score identique")
+                txtproduit += ("\nIl n'y a pas d'autre produit dans cette catégorie"+
+                               " avec un score identique")
                 return save_option(txtproduit, product_info[0])
-                
+
         else:
-            txtproduit +=("\nVoici une alternative à votre produit avec un meilleur nutriscore :\n")
-            txtproduit +=(str_product(get_alternative(product_info[0])))
+            txtproduit += ("\nVoici une alternative à votre produit"+
+                           " avec un meilleur nutriscore :\n")
+            txtproduit += (str_product(get_alternative(product_info[0])))
 
     else:
-        txtproduit +=("Le nutriscore du produit que vous avez sélectionné n'est pas renseigné.\n")
-        txtproduit +=("Voici un produit de la même catégorie avec le meilleur nutriscore possible :\n")
-        txtproduit +=(str_product(get_alternative(product_info[0])))
+        txtproduit += ("Le nutriscore du produit que vous avez sélectionné n'est pas renseigné.\n")
+        txtproduit += ("Voici un produit de la même catégorie"+
+                       " avec le meilleur nutriscore possible :\n")
+        txtproduit += (str_product(get_alternative(product_info[0])))
 
-    return save_option(txtproduit, get_alternative(product_info[0])[0] )
-
+    return save_option(txtproduit, get_alternative(product_info[0])[0])
 
 def filldatabase_menu(text_choice, category_txt, category_id):
     text_choice += ("\nIl n'y a pas de produits pour cette catégorie, voulez-vous requêter"+
@@ -112,6 +127,9 @@ def filldatabase_menu(text_choice, category_txt, category_id):
     return user_choice
 
 def display_next_page(page, total_pages, text_choice, category_id):
+    """
+    Displays next page from a category
+    """
     if page+1 <= total_pages:
         page += 1
         clear_and_print(text_choice)
@@ -122,7 +140,10 @@ def display_next_page(page, total_pages, text_choice, category_id):
         print("Dernière page atteinte")
     return page
 
-def display_previous_page(page, total_pages, text_choice, category_id):
+def display_previous_page(page, text_choice, category_id):
+    """
+    Displays previous page from a category
+    """
     if page-1 > 0:
         page -= 1
         clear_and_print(text_choice)
@@ -134,6 +155,9 @@ def display_previous_page(page, total_pages, text_choice, category_id):
     return page
 
 def display_pages(text_choice, category_id):
+    """
+    Handles page navigation in a category
+    """
     page = 1
     total_pages = get_number_pages(category_id)
     if total_pages > 1:
@@ -154,7 +178,7 @@ def display_pages(text_choice, category_id):
 
         elif user_choice.lower() == 'b':
             #~ Display previous page
-            page = display_previous_page(page, total_pages, text_choice, category_id)
+            page = display_previous_page(page, text_choice, category_id)
 
         else:
             try:
@@ -182,7 +206,10 @@ def display_pages(text_choice, category_id):
     return user_choice
 
 def select_product(categories, choice_int):
-
+    """
+    Display menu to select a product, with page navigation or option to fill database if
+    the category is empty
+    """
     #~ Display the menu to select a product and handle the choice
     category_id = categories[choice_int][0]
     category_txt = categories[choice_int][1]
@@ -198,8 +225,10 @@ def select_product(categories, choice_int):
         return display_pages(text_choice, category_id)
 
 def select_category():
+    """
+    Display the menu to select a category and handle the choice
+    """
 
-    #~ Display the menu to select a category and handle the choice
     txt_menu_cat = ("Selectionnez votre catégorie d'aliment à l'aide du numéro, Q pour quitter, "+
                     "M pour revenir au menu principal:\n")
     #~ Add categories to menu
@@ -233,7 +262,10 @@ def select_category():
         user_choice = input(">>")
     return user_choice
 
-def menu_principal():
+def main_menu():
+    """
+    Display the main menu and handles the choice
+    """
 
     txt_menu1 = ("Selectionnez votre choix à l'aide du numéro, Q pour quitter:\n"+
                  "1 - Quel aliment souhaitez-vous remplacer ?\n"+
@@ -262,10 +294,9 @@ def menu_principal():
             clear_and_print(txt_menu1, 'Choix non reconnu')
         user_choice = input(">>")
 
-def main(args):
-
-    menu_principal()
+def main():
+    main_menu()
     return 0
 
 if __name__ == '__main__':
-    sys.exit(main(sys.argv))
+    main()
