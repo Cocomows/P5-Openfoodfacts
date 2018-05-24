@@ -296,7 +296,7 @@ def get_str_saved():
     """
     Returns string with all saved products formatted
     """
-    format_string = '{0:30} | {1:50} | {2:^10} | {3:50} | {4}  \n'
+    format_string = '{0:30} | {1:55} | {2:^10} | {3:50} | {4}  \n'
     res = format_string.format('Catégorie', 'Produit - Marque', 'Nutriscore', 'Lien', 'Magasin')
     res += '='*170
     res += '\n'
