@@ -3,11 +3,15 @@
 """
 Module used to handle interactions with the database and display functions
 in the openfoodfact project
+
+Source for the progress bar used : https://gist.github.com/aubricus/f91fb55dc6ba5557fbab06119420dd6a
 """
 import sys
 import math
 import mysql.connector
 import requests
+from db_parameters import CONNECTION_PARAMETERS
+
 
 ROWS_PER_PAGE = 40
 
@@ -18,13 +22,6 @@ NUTRISCORE = {
     3: 'C',
     4: 'D',
     5: 'E'
-}
-
-CONNECTION_PARAMETERS = {
-    "host": "localhost",
-    "user": "cocomo",
-    "password": "password",
-    "database": "openfoodfacts"
 }
 
 def print_products_page(category_id, page):
@@ -356,9 +353,9 @@ def print_progress(iteration, total, prefix='', suffix='', decimals=1, bar_lengt
     str_format = "{0:." + str(decimals) + "f}"
     percents = str_format.format(100 * (iteration / float(total)))
     filled_length = int(round(bar_length * iteration / float(total)))
-    bar = '█' * filled_length + '-' * (bar_length - filled_length)
+    progress_bar = '█' * filled_length + '-' * (bar_length - filled_length)
 
-    sys.stdout.write('\r%s |%s| %s%s %s' % (prefix, bar, percents, '%', suffix)),
+    sys.stdout.write('\r%s |%s| %s%s %s' % (prefix, progress_bar, percents, '%', suffix)),
 
     if iteration == total:
         sys.stdout.write('\n')

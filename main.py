@@ -4,6 +4,7 @@
 """
 Module used to offer a command line interface to navigate the application
 P5 Openfoodfacts.
+
 Displays products for a given Openfoodfacts category and offers an alternative product with
 a better nutriscore when user selects a product
 """
@@ -276,7 +277,7 @@ def main_menu():
 
     while True:
         if user_choice == '1':
-            #~ Demander la catégorie
+            #~ Display categories
             user_choice = select_category()
             if user_choice.lower() == 'm':
                 clear_and_print(txt_menu1)
@@ -284,7 +285,7 @@ def main_menu():
                 #~ If user quit in submenu
                 break
         elif user_choice == '2':
-            #~ Retrouver les aliments substitués
+            #~ Display saved products
             str_saved = "Voici la liste des aliments sauvegardés :\n\n"
             str_saved += get_str_saved()
             clear_and_print(txt_menu1, str_saved)
