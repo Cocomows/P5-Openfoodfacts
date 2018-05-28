@@ -8,7 +8,7 @@ Install the required files with:
 `pip install -r requirements.txt`
 
 Create the database with the command: 
-`mysql -h localhost -u [user] openfoodfacts < path/to/openfoodfact.sql`
+`mysql -h localhost -u [user] openfoodfacts < path/to/db_openfoodfact.sql`
 
 # How to use the application
 Launch the application with : 
