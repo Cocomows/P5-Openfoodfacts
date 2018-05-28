@@ -77,7 +77,7 @@ def display_alternative_product(choice_int, category_id, page):
 
     txtproduit += str_product(product_info)
     if nutriscore_int != 0:
-        txtproduit += ("Ce produit a un nutriscore de {}.\n".format(NUTRISCORE[nutriscore_int]))
+        txtproduit += ("\n\n<<< Ce produit a un nutriscore de {}. >>>\n".format(NUTRISCORE[nutriscore_int]))
         if nutriscore_int == get_best_score_category(category_id):
             txtproduit += ("\nFélicitations, votre produit possède déjà le"+
                            " meilleur score de sa catégorie !\n")
@@ -96,7 +96,7 @@ def display_alternative_product(choice_int, category_id, page):
             txtproduit += (str_product(get_alternative(product_info[0])))
 
     else:
-        txtproduit += ("Le nutriscore du produit que vous avez sélectionné n'est pas renseigné.\n")
+        txtproduit += ("\n\nLe nutriscore du produit que vous avez sélectionné n'est pas renseigné.\n")
         txtproduit += ("Voici un produit de la même catégorie"+
                        " avec le meilleur nutriscore possible :\n")
         txtproduit += (str_product(get_alternative(product_info[0])))
