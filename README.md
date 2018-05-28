@@ -1,16 +1,16 @@
 # P5-Openfoodfacts
 
-# Pre requisite 
+## Pre requisite 
 Python 3 and MySQL must be installed on the OS.
 
-# Environnement installation
+## Environnement installation
 Install the required files with:
 `pip install -r requirements.txt`
 
 Create the database with the command: 
 `mysql -h localhost -u [user] openfoodfacts < path/to/db_openfoodfact.sql`
 
-# How to use the application
+## How to use the application
 Launch the application with : 
 `python3 main.py`
 
