@@ -9,6 +9,7 @@ Install the required files with:
 
 Create the database with the command: 
 `mysql -h localhost -u [user] openfoodfacts < path/to/db_openfoodfact.sql`
+Edit the db_parameters.py file with your database information.
 
 ## How to use the application
 Launch the application with : 
